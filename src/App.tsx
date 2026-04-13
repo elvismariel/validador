@@ -16,6 +16,10 @@ interface SchemaProperty {
   type: PropertyType;
   description?: string;
   enum?: string[];
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  format?: string;
   properties?: Record<string, SchemaProperty>;
   required?: string[];
 }
@@ -85,6 +89,20 @@ const PropertyNode: React.FC<PropertyNodeProps> = ({
       }
     }
     
+    if (field === 'minLength' || field === 'maxLength') {
+      if (value === '' || isNaN(Number(value))) {
+        delete newInfo[field];
+      } else {
+        newInfo[field] = Number(value);
+      }
+    }
+
+    if (field === 'pattern' || field === 'format') {
+      if (!value) {
+        delete newInfo[field];
+      }
+    }
+
     if (field === 'type') {
       if (value === 'object') {
         newInfo.properties = newInfo.properties || {};
@@ -95,6 +113,10 @@ const PropertyNode: React.FC<PropertyNodeProps> = ({
       }
       if (value !== 'string') {
         delete newInfo.enum;
+        delete newInfo.pattern;
+        delete newInfo.minLength;
+        delete newInfo.maxLength;
+        delete newInfo.format;
       }
     }
     
@@ -192,15 +214,66 @@ const PropertyNode: React.FC<PropertyNodeProps> = ({
       </div>
 
       {propInfo.type === 'string' && (
-        <div className="input-group">
-          <label className="input-label">Valores Permitidos (Enum, separados por vírgula)</label>
-          <input 
-            type="text" 
-            className="input-field" 
-            placeholder="Ex: AVAILABLE, UNAVAILABLE"
-            value={propInfo.enum ? propInfo.enum.join(', ') : ''} 
-            onChange={e => updateField('enum', e.target.value)}
-          />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem', padding: '0.75rem', background: 'rgba(0,0,0,0.1)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="input-group">
+            <label className="input-label">Formato Especial</label>
+            <select
+              className="input-field"
+              value={propInfo.format || ''}
+              onChange={e => updateField('format', e.target.value)}
+            >
+              <option value="">Texto Livre</option>
+              <option value="date-time">Data e Hora (date-time ISO 8601)</option>
+              <option value="date">Data (date)</option>
+              <option value="time">Hora (time)</option>
+              <option value="email">Email</option>
+              <option value="uuid">UUID</option>
+            </select>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">Valores Permitidos (Enum, separados por vírgula)</label>
+            <input 
+              type="text" 
+              className="input-field" 
+              placeholder="Ex: PRODUCT, CHANNEL, GENERAL"
+              value={propInfo.enum ? propInfo.enum.join(', ') : ''} 
+              onChange={e => updateField('enum', e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="input-group" style={{ flex: 2 }}>
+              <label className="input-label">Pattern (Regex)</label>
+              <input 
+                type="text" 
+                className="input-field" 
+                placeholder="Ex: ^[0-9]{11}$"
+                value={propInfo.pattern || ''} 
+                onChange={e => updateField('pattern', e.target.value)}
+              />
+            </div>
+            <div className="input-group" style={{ flex: 1 }}>
+              <label className="input-label">Min Length</label>
+              <input 
+                type="number" 
+                className="input-field" 
+                placeholder="Ex: 11"
+                value={propInfo.minLength !== undefined ? propInfo.minLength : ''} 
+                onChange={e => updateField('minLength', e.target.value)}
+              />
+            </div>
+            <div className="input-group" style={{ flex: 1 }}>
+              <label className="input-label">Max Length</label>
+              <input 
+                type="number" 
+                className="input-field" 
+                placeholder="Ex: 11"
+                value={propInfo.maxLength !== undefined ? propInfo.maxLength : ''} 
+                onChange={e => updateField('maxLength', e.target.value)}
+              />
+            </div>
+          </div>
         </div>
       )}
 

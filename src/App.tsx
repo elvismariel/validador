@@ -22,6 +22,7 @@ interface SchemaProperty {
   format?: string;
   properties?: Record<string, SchemaProperty>;
   required?: string[];
+  additionalProperties?: boolean;
 }
 
 interface JsonSchema {
@@ -107,9 +108,11 @@ const PropertyNode: React.FC<PropertyNodeProps> = ({
       if (value === 'object') {
         newInfo.properties = newInfo.properties || {};
         newInfo.required = newInfo.required || [];
+        newInfo.additionalProperties = false;
       } else {
         delete newInfo.properties;
         delete newInfo.required;
+        delete newInfo.additionalProperties;
       }
       if (value !== 'string') {
         delete newInfo.enum;
@@ -332,6 +335,21 @@ function App() {
     updateSchema(newSchema);
   };
 
+  const clearSchema = () => {
+    if (window.confirm("Tem certeza que deseja limpar todo o modelo?")) {
+      const emptySchema: JsonSchema = {
+        $schema: "http://json-schema.org/draft-07/schema#",
+        type: "object",
+        title: "",
+        description: "",
+        additionalProperties: false,
+        properties: {},
+        required: []
+      };
+      updateSchema(emptySchema);
+    }
+  };
+
   const addProperty = () => {
     const key = `new_property_${Object.keys(schema.properties).length + 1}`;
     const newSchema = {
@@ -382,8 +400,35 @@ function App() {
 
 
   // --- Validation Logic ---
+  const validateSchemaObjectRule = (schemaObj: any): string | null => {
+    let error: string | null = null;
+    const checkObject = (obj: any, path: string) => {
+      if (obj && obj.type === 'object') {
+        if (!obj.required || obj.required.length === 0) {
+          error = `Regra de Schema Inválida: O objeto '${path || 'root'}' DEVE possuir ao menos uma propriedade marcada como obrigatória (required).`;
+          return;
+        }
+        if (obj.properties) {
+          for (const key in obj.properties) {
+            checkObject(obj.properties[key], path ? `${path}.${key}` : key);
+            if (error) return;
+          }
+        }
+      }
+    };
+    checkObject(schemaObj, '');
+    return error;
+  };
+
   const validatePayload = useMemo(() => {
     return (schemaObj: JsonSchema, payloadStr: string) => {
+      const schemaRuleError = validateSchemaObjectRule(schemaObj);
+      if (schemaRuleError) {
+        setPayloadValid(false);
+        setPayloadErrors(schemaRuleError);
+        return;
+      }
+
       try {
         const data = JSON.parse(payloadStr);
         // Compile schema
@@ -395,7 +440,16 @@ function App() {
           setPayloadErrors('Payload válido!');
         } else {
           setPayloadValid(false);
-          const errors = validate.errors?.map(e => `${e.instancePath} ${e.message}`).join(', ') || 'Erro de validação';
+          const errors = validate.errors?.map(e => {
+            const path = e.instancePath ? `Em '${e.instancePath}': ` : '';
+            if (e.keyword === 'additionalProperties') {
+              return `${path}Propriedade não esperada no payload ('${e.params.additionalProperty}')`;
+            }
+            if (e.keyword === 'required') {
+              return `${path}Falta a propriedade obrigatória ('${e.params.missingProperty}')`;
+            }
+            return `${path}${e.message}`;
+          }).join(' | ') || 'Erro de validação';
           setPayloadErrors(errors);
         }
       } catch (e: any) {
@@ -419,10 +473,18 @@ function App() {
     <div className="layout-container">
       {/* LEFT PANEL: VISUAL BUILDER */}
       <div className="panel-left glass-panel">
-        <div className="panel-header">
+        <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="panel-title">
             <Settings size={20} className="text-primary" />
             Construtor Visual (JSON Schema)
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn" style={{ background: 'transparent', border: '1px solid #ef4444', color: '#ef4444' }} onClick={clearSchema}>
+              <Trash2 size={16} /> Limpar Tudo
+            </button>
+            <button className="btn" onClick={addProperty}>
+              <Plus size={16} /> Nova Propriedade
+            </button>
           </div>
         </div>
         <div className="panel-content">
@@ -460,11 +522,8 @@ function App() {
             </label>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2rem 0 1rem' }}>
+          <div style={{ margin: '2rem 0 1rem' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 600 }}>Propriedades do Payload</h3>
-            <button className="btn" onClick={addProperty}>
-              <Plus size={16} /> Nova Propriedade
-            </button>
           </div>
 
           {Object.entries(schema.properties).map(([key, prop]) => (

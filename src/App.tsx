@@ -477,6 +477,70 @@ function App() {
     }
   }, [schemaText, payloadText, validatePayload]);
 
+  const handleSaveToGithub = async () => {
+    if (!schema.title) {
+      alert("Para salvar, o evento deve ter um 'Title' preenchido, que será usado como nome do arquivo.");
+      return;
+    }
+
+    const fileName = `${schema.title}.json`;
+    const repoUrl = `https://api.github.com/repos/elvismariel/validador/contents/public/canonical/${fileName}`;
+
+    let token = localStorage.getItem('gh_token');
+    if (!token) {
+      token = prompt('Para salvar diretamente no GitHub, insira seu Personal Access Token (PAT) com permissão de escrita no repositório:');
+      if (token) {
+        localStorage.setItem('gh_token', token);
+      } else {
+        return;
+      }
+    }
+
+    try {
+      // 1. Tenta buscar o arquivo para pegar o SHA (necessário para atualizar caso já exista)
+      const getRes = await fetch(repoUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      let sha;
+      if (getRes.ok) {
+        const data = await getRes.json();
+        sha = data.sha;
+      }
+
+      // 2. Prepara o conteúdo Base64 seguro para UTF-8 acentuado
+      const contentStr = JSON.stringify(schema, null, 2);
+      const utf8Bytes = new TextEncoder().encode(contentStr);
+      const base64Content = btoa(Array.from(utf8Bytes, byte => String.fromCharCode(byte)).join(''));
+      
+      // 3. Envia o arquivo por PUT
+      const putRes = await fetch(repoUrl, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: `feat(schema): salva schema persistido do validador ${fileName}`,
+          content: base64Content,
+          ...(sha ? { sha } : {})
+        })
+      });
+
+      if (putRes.ok) {
+        alert('Salvo no diretório public/canonical do GitHub com sucesso!');
+      } else {
+        const errorData = await putRes.json();
+        alert(`Erro ao salvar no repositório: ${errorData.message}`);
+        if (errorData.message.includes('Bad credentials') || errorData.message.includes('Requires authentication')) {
+          localStorage.removeItem('gh_token');
+        }
+      }
+    } catch (e: any) {
+      alert('Erro na requisição ou de conexão: ' + e.message);
+    }
+  };
+
   return (
     <div className="layout-container">
       {/* LEFT PANEL: VISUAL BUILDER */}
@@ -568,7 +632,7 @@ function App() {
           <button 
             className="btn" 
             disabled={!(schemaValid && payloadValid)} 
-            onClick={() => alert('Salvo com sucesso!')}
+            onClick={handleSaveToGithub}
             style={{ 
               display: 'flex', 
               alignItems: 'center', 

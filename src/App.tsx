@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Editor from '@monaco-editor/react';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { Settings, Plus, Trash2, CheckCircle, XCircle, Code, Play } from 'lucide-react';
+import { Settings, Plus, Trash2, CheckCircle, XCircle, Code, Play, Save } from 'lucide-react';
 import './index.css';
 
 // Initialize AJV
@@ -328,6 +328,7 @@ function App() {
 
   // Schema Editor State for raw edit mode
   const [schemaText, setSchemaText] = useState<string>(JSON.stringify(initialSchema, null, 2));
+  const [schemaValid, setSchemaValid] = useState<boolean>(true);
 
   // --- Visual Builder Handlers ---
   const handleMetaChange = (field: keyof JsonSchema, value: string | boolean) => {
@@ -463,9 +464,16 @@ function App() {
   useEffect(() => {
     try {
       const parsedSchema = JSON.parse(schemaText);
+      const schemaRuleError = validateSchemaObjectRule(parsedSchema);
+      if (schemaRuleError) {
+        setSchemaValid(false);
+      } else {
+        setSchemaValid(true);
+      }
       validatePayload(parsedSchema, payloadText);
     } catch {
       // invalid schema text, skip payload validation
+      setSchemaValid(false);
     }
   }, [schemaText, payloadText, validatePayload]);
 
@@ -512,14 +520,7 @@ function App() {
               />
             </div>
             
-            <label className="checkbox-wrapper mt-2">
-              <input 
-                type="checkbox" 
-                checked={schema.additionalProperties === false}
-                onChange={e => handleMetaChange('additionalProperties', !e.target.checked)}
-              />
-              <span className="input-label">Não permitir propriedades adicionais (strict mode)</span>
-            </label>
+
           </div>
 
           <div style={{ margin: '2rem 0 1rem' }}>
@@ -547,7 +548,7 @@ function App() {
 
       {/* RIGHT PANEL: EDITOR & PAYLOAD TESTER */}
       <div className="panel-right glass-panel">
-        <div className="panel-header" style={{ padding: '0.75rem 1.5rem' }}>
+        <div className="panel-header" style={{ padding: '0.75rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="tabs">
             <div 
               className={`tab ${activeTab === 'schema' ? 'active' : ''}`}
@@ -564,6 +565,22 @@ function App() {
               <Play size={16} /> Testar Payload
             </div>
           </div>
+          <button 
+            className="btn" 
+            disabled={!(schemaValid && payloadValid)} 
+            onClick={() => alert('Salvo com sucesso!')}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              padding: '6px 12px',
+              opacity: (schemaValid && payloadValid) ? 1 : 0.5,
+              cursor: (schemaValid && payloadValid) ? 'pointer' : 'not-allowed',
+              background: (schemaValid && payloadValid) ? 'rgba(99, 102, 241, 0.8)' : 'rgba(255, 255, 255, 0.1)'
+            }}
+          >
+            <Save size={16} /> Salvar
+          </button>
         </div>
         
         <div className="panel-content" style={{ padding: '0', display: 'flex', flexDirection: 'column' }}>

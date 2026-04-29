@@ -1,5 +1,0 @@
-aça os seguintes ajuste para quando o usuário definir um campo com o tipo "string":
-1 - Receber um valor de texto. Ex: teste de string
-2 - Receber um enum de valores separados por vígula. Ex: PRODUCT, CHANNEL, GENERAL
-3 - Receber um pattern de validação, e permitir min e max de caracteres. Ex: pattern: [0-9]{11}, min:11, max:11
-4 - Receber um "date-time" no seguinte formato "2026-04-11T19:45:00-03:00". 

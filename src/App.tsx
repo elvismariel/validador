@@ -78,8 +78,9 @@ interface PropertyNodeProps {
 const PropertyNode: React.FC<PropertyNodeProps> = ({
   propertyKey, propInfo, isRequired, onChangeKey, onDelete, onChangeInfo, onToggleRequired
 }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateField = (field: keyof SchemaProperty, value: any) => {
-    let newInfo = { ...propInfo, [field]: value };
+    const newInfo = { ...propInfo, [field]: value };
     
     if (field === 'enum') {
       const enumVals = value.split(',').map((v: string) => v.trim()).filter(Boolean);
@@ -328,7 +329,6 @@ function App() {
 
   // Schema Editor State for raw edit mode
   const [schemaText, setSchemaText] = useState<string>(JSON.stringify(initialSchema, null, 2));
-  const [schemaValid, setSchemaValid] = useState<boolean>(true);
 
   // --- Visual Builder Handlers ---
   const handleMetaChange = (field: keyof JsonSchema, value: string | boolean) => {
@@ -401,8 +401,10 @@ function App() {
 
 
   // --- Validation Logic ---
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const validateSchemaObjectRule = (schemaObj: any): string | null => {
     let error: string | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const checkObject = (obj: any, path: string) => {
       if (obj && obj.type === 'object') {
         if (!obj.required || obj.required.length === 0) {
@@ -453,29 +455,31 @@ function App() {
           }).join(' | ') || 'Erro de validação';
           setPayloadErrors(errors);
         }
-      } catch (e: any) {
+      } catch (e) {
         setPayloadValid(false);
-        setPayloadErrors('JSON Inválido: ' + e.message);
+        setPayloadErrors('JSON Inválido: ' + (e instanceof Error ? e.message : String(e)));
       }
     }
   }, []);
 
+  // Derive schema validation state
+  const { schemaValid, parsedSchema } = useMemo(() => {
+    try {
+      const parsed = JSON.parse(schemaText);
+      const schemaRuleError = validateSchemaObjectRule(parsed);
+      return { schemaValid: !schemaRuleError, parsedSchema: parsed };
+    } catch {
+      return { schemaValid: false, parsedSchema: null };
+    }
+  }, [schemaText]);
+
   // Run validation when schema or payload changes
   useEffect(() => {
-    try {
-      const parsedSchema = JSON.parse(schemaText);
-      const schemaRuleError = validateSchemaObjectRule(parsedSchema);
-      if (schemaRuleError) {
-        setSchemaValid(false);
-      } else {
-        setSchemaValid(true);
-      }
+    if (parsedSchema) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       validatePayload(parsedSchema, payloadText);
-    } catch {
-      // invalid schema text, skip payload validation
-      setSchemaValid(false);
     }
-  }, [schemaText, payloadText, validatePayload]);
+  }, [parsedSchema, payloadText, validatePayload]);
 
   const handleSaveToGithub = async () => {
     if (!schema.title) {
@@ -536,8 +540,8 @@ function App() {
           localStorage.removeItem('gh_token');
         }
       }
-    } catch (e: any) {
-      alert('Erro na requisição ou de conexão: ' + e.message);
+    } catch (e) {
+      alert('Erro na requisição ou de conexão: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
 
@@ -674,7 +678,9 @@ function App() {
                     try {
                       const p = JSON.parse(val);
                       setSchema(p);
-                    } catch {}
+                    } catch (e) {
+                      console.debug("Invalid JSON during typing", e);
+                    }
                   }
                 }}
                 options={{

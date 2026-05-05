@@ -569,8 +569,9 @@ function App() {
             <h3 style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>Metadados do Evento</h3>
             
             <div className="input-group">
-              <label className="input-label">Title (Nome do Evento)</label>
+              <label htmlFor="title" className="input-label">Title (Nome do Evento)</label>
               <input 
+                id="title"
                 type="text" 
                 className="input-field" 
                 value={schema.title} 
@@ -579,8 +580,9 @@ function App() {
             </div>
 
             <div className="input-group">
-              <label className="input-label">Description</label>
+              <label htmlFor="description" className="input-label">Description</label>
               <input 
+                id="description"
                 type="text" 
                 className="input-field" 
                 value={schema.description} 

@@ -22,6 +22,9 @@ FROM nginx:alpine
 # Copia os arquivos gerados no estágio anterior para o diretório pardrão do nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# Copia as configurações customizadas do Nginx com o healthcheck
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # A porta 80 é exposta pelo container (configuração padrão do nginx)
 EXPOSE 80
 

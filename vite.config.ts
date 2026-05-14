@@ -4,7 +4,18 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'healthcheck-plugin',
+      configureServer(server) {
+        server.middlewares.use('/healthcheck', (_req, res) => {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ status: 'up' }));
+        });
+      }
+    }
+  ],
   test: {
     globals: true,
     environment: 'jsdom',

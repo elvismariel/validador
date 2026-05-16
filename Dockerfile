@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # Estágio final/produção (Nginx)
-FROM nginx:alpine
+FROM nginxinc/nginx-unprivileged:alpine
 
 # Copia os arquivos gerados no estágio anterior para o diretório pardrão do nginx
 COPY --from=build /app/dist /usr/share/nginx/html
@@ -25,8 +25,8 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Copia as configurações customizadas do Nginx com o healthcheck
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# A porta 80 é exposta pelo container (configuração padrão do nginx)
-EXPOSE 80
+# A porta 8080 é exposta pelo container (configuração padrão do nginx unprivileged)
+EXPOSE 8080
 
 # Comando para rodar o Nginx no foreground garantindo que o container continue rodando
 CMD ["nginx", "-g", "daemon off;"]

@@ -16,7 +16,7 @@ import App from './App';
 
 vi.mock('@monaco-editor/react', () => {
   return {
-    default: ({ value, onChange }: any) => (
+    default: ({ value, onChange }: { value: string, onChange: (v: string) => void }) => (
       <textarea 
         data-testid="monaco-editor"
         value={value} 

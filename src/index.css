@@ -262,3 +262,14 @@ select.input-field option {
   height: 16px;
   accent-color: var(--primary-color);
 }
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}

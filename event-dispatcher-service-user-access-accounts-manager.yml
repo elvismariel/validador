@@ -1,0 +1,53 @@
+name: event-dispatcher-service-user-access-accounts-manager
+description: event-dispatcher-service-user-access-accounts-manager
+tags:
+  application_service: user-access-service
+  order_required: false
+  owner_squad: l-atom-alcadas
+  business_capability: registry
+  business_service: access-permissions-management
+  owner_sre: l-sre-flc
+envs:
+  hom:
+    log:
+      level: info
+    http:
+      host: 0.0.0.0
+      port: 8080
+    Metric:
+      ListenAddr: 0.0.0.0:9090
+    adapter:
+      type: http
+      http:
+        url: https://user-access.banking.gondor.hom.infra
+        path: /accounts/managers/event
+        headers:
+          content-type: application/json
+          accept: application/json
+        allowed_status:
+          - 200
+          - 202
+          - 204
+        verb: PUT
+    broker:
+      nats:
+        name: cluster-nats
+        urls:
+          - nats://nats-server-c3.hom.eventcloud.gondor.infra:4223
+    consumer:
+      name: event-dispatcher-service-user-access-accounts-manager
+      namespace: registry.single-registry-service.partner-legal-manager.changed
+      stream: registry
+      channel: false
+      delivery:
+        policy: last
+      pool:
+        size: 8
+      max:
+        poll:
+          message: 1
+      ack_wait: 45s
+      max_waiting: 10000
+      max_ack_pending: 10000
+      max_batch: 10000
+      max_bytes: 10240000

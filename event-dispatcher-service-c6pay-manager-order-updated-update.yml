@@ -1,0 +1,111 @@
+name: event-dispatcher-service-c6pay-manager-order-updated-update
+description: Process and redirect C6Pay order events to Salesforce, so that opportunities may be updated accordingly
+tags:
+  application_service: customer-support-c6pay-manager-service
+  order_required: false
+  owner_squad: l-atom-salesforce-comercial-pj
+  business_capability: crm
+  business_service: customer-support
+  owner_sre: l-sre-crm-services
+envs:
+  hom:
+    log:
+      level: info
+    http:
+      host: 0.0.0.0
+      port: 8080
+    Metric:
+      ListenAddr: 0.0.0.0:9090
+    adapter:
+      type: queue
+      queue:
+        name: product-support-c6pay-manager-order-updated-hom-sqs
+        url: https://sqs.us-east-2.amazonaws.com/302001318918/product-support-c6pay-manager-order-updated-hom-sqs
+        aws:
+          region: us-east-2
+          endpoints:
+            sqs: https://vpce-08c4a35e4043fb22b-nkoqc85f.sqs.us-east-2.vpce.amazonaws.com
+        msg:
+          max: 10
+        visibility:
+          time: 30
+        send:
+          delay_seconds: 10
+        pool:
+          size: 32
+    broker:
+      nats:
+        name: cluster-nats
+        urls:
+          - nats://nats-server-c2.hom.eventcloud.gondor.infra:4223
+    processor:
+      filter_version:
+        order: 0
+        mode: REJECT
+        versions:
+          - 2
+          - 4
+
+      filter_attribute:
+        order: 1
+        mode: reject
+        operation: or
+        rules:
+          - path: product
+            type: regex
+            value: GLOBAL_USD|GLOBAL_EURO
+          - path: card_operation
+            type: regex
+            value: CREDIT|DEBIT
+
+      addtag:
+        order: 2
+        tags:
+          counterpart.country: BRASIL
+          operation_origin: checking_account_complete
+          product: checking_account
+
+      replace:
+        order: 3
+        force_marshal: true
+        targets:
+          - find: (\d{4}[[*x]{8,})
+            field: truncated_card_number
+            replace: ''
+          - find: (\s([^[:print:]]+))|(\\u\w{4})|(\\n|\\r|\\)
+            field: merchant
+            replace: ''
+
+      regexreplace:
+        order: 4
+        force_marshal: true
+        targets:
+          - find: (\d{4}[\*|x]{8,})|(\s([^[:print:]]+))|(\\u\w{4})|(\\n|\\r|\\)
+            replace: ''
+      
+      transform:
+        order: 5
+        content-type: application/json
+        accept-unknown-namespace: false
+        templates:
+          default: |
+            {
+              "user_id": "{{ .user_id }}"
+            }
+    consumer:
+      name: event-dispatcher-service-c6pay-manager-order-updated-update
+      namespace: acquirer.c6pay-onboarding-contracting-service.order.updated
+      stream: acquirer
+      channel: false
+      delivery:
+        policy: last
+      pool:
+        size: 8
+      max:
+        poll:
+          message: 1000
+      ack_wait: 45s
+      max_waiting: 10000
+      max_ack_pending: 10000
+      max_batch: 10000
+      max_bytes: 10240000

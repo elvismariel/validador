@@ -3,6 +3,8 @@ import Editor from '@monaco-editor/react';
 import { Settings, Code, Trash2 } from 'lucide-react';
 import YAML from 'yaml';
 import { Modal } from './Modal';
+import { ProcessorEditor } from './ProcessorEditor';
+import type { AnyProcessor, ProcessorType } from '../types/processors';
 
 // --- Types ---
 type AdapterType = 'http' | 'queue';
@@ -33,6 +35,7 @@ interface YamlFormData {
     region: string;
     endpoints: string;
   };
+  processors: AnyProcessor[];
 }
 
 const initialFormData: YamlFormData = {
@@ -60,13 +63,45 @@ const initialFormData: YamlFormData = {
     url: "https://sqs.us-east-1.amazonaws.com/123/example",
     region: "us-east-1",
     endpoints: "https://vpce-sqs.us-east-1.vpce.amazonaws.com"
-  }
+  },
+  processors: []
 };
 
 export function YamlSchemaBuilder() {
   const [formData, setFormData] = useState<YamlFormData>(initialFormData);
-
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, action: () => void}>({ isOpen: false, action: () => {} });
+
+  // Drag and Drop State
+  const [draggableId, setDraggableId] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+    setFormData(prev => {
+      const newProcessors = [...prev.processors];
+      const draggedItem = newProcessors[draggedIndex];
+      newProcessors.splice(draggedIndex, 1);
+      newProcessors.splice(dropIndex, 0, draggedItem);
+      
+      const updatedProcessors = newProcessors.map((p, idx) => ({ ...p, order: idx }));
+      
+      return { ...prev, processors: updatedProcessors };
+    });
+    setDraggedIndex(null);
+    setDraggableId(null);
+  };
 
   const clearForm = () => {
     setConfirmModal({
@@ -86,7 +121,8 @@ export function YamlSchemaBuilder() {
           },
           adapterType: 'http',
           http: { url: "", path: "", headers: "", allowed_status: "", verb: "" },
-          queue: { name: "", url: "", region: "", endpoints: "" }
+          queue: { name: "", url: "", region: "", endpoints: "" },
+          processors: []
         });
         setConfirmModal({ isOpen: false, action: () => {} });
       }
@@ -136,6 +172,68 @@ export function YamlSchemaBuilder() {
       };
     }
 
+    let processorBlock: Record<string, unknown> | undefined = undefined;
+    if (formData.processors.length > 0) {
+      const pBlock: Record<string, unknown> = {};
+      formData.processors.forEach(proc => {
+        switch (proc.type) {
+          case 'filter_version':
+            pBlock.filter_version = {
+              order: proc.order,
+              mode: proc.mode,
+              versions: proc.versions.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+            };
+            break;
+          case 'filter_attribute':
+            pBlock.filter_attribute = {
+              order: proc.order,
+              mode: proc.mode,
+              operation: proc.operation,
+              rules: proc.rules
+            };
+            break;
+          case 'addtag': {
+            const tagsObj: Record<string, string> = {};
+            proc.tags.forEach(t => { if (t.key) tagsObj[t.key] = t.value; });
+            pBlock.addtag = {
+              order: proc.order,
+              tags: tagsObj
+            };
+            break;
+          }
+          case 'replace':
+            pBlock.replace = {
+              order: proc.order,
+              force_marshal: proc.force_marshal,
+              targets: proc.targets
+            };
+            break;
+          case 'regexreplace':
+            pBlock.regexreplace = {
+              order: proc.order,
+              force_marshal: proc.force_marshal,
+              targets: proc.targets
+            };
+            break;
+          case 'transform': {
+            const templateStr = proc.templates.endsWith('\n') ? proc.templates : proc.templates + '\n';
+            const templateScalar = new YAML.Scalar(templateStr);
+            templateScalar.type = 'BLOCK_LITERAL';
+            pBlock.transform = {
+              order: proc.order,
+              'content-type': proc.contentType,
+              'accept-unknown-namespace': proc.acceptUnknownNamespace,
+              templates: {
+                default: templateScalar
+              }
+            };
+            break;
+          }
+        }
+      });
+      processorBlock = pBlock;
+    }
+
     const docObj = {
       name: formData.name,
       description: formData.description,
@@ -159,6 +257,7 @@ export function YamlSchemaBuilder() {
               urls: ['nats://nats-server-c2.hom.eventcloud.gondor.infra:4223']
             }
           },
+          ...(processorBlock ? { processor: processorBlock } : {}),
           consumer: {
             name: formData.name,
             namespace: formData.namespace,
@@ -192,6 +291,52 @@ export function YamlSchemaBuilder() {
       }
       current[keys[keys.length - 1]] = value;
       return updated as unknown as YamlFormData;
+    });
+  };
+
+  const addProcessor = (type: ProcessorType) => {
+    const newOrder = formData.processors.length;
+    const id = Date.now().toString();
+    
+    let newProc: AnyProcessor;
+    switch (type) {
+      case 'filter_version':
+        newProc = { id, type, order: newOrder, mode: 'reject', versions: '' };
+        break;
+      case 'filter_attribute':
+        newProc = { id, type, order: newOrder, mode: 'reject', operation: 'or', rules: [] };
+        break;
+      case 'addtag':
+        newProc = { id, type, order: newOrder, tags: [] };
+        break;
+      case 'replace':
+        newProc = { id, type, order: newOrder, force_marshal: true, targets: [] };
+        break;
+      case 'regexreplace':
+        newProc = { id, type, order: newOrder, force_marshal: true, targets: [] };
+        break;
+      case 'transform':
+        newProc = { id, type, order: newOrder, contentType: 'application/json', acceptUnknownNamespace: false, templates: '{\n  "user_id": "{{ .user_id }}"\n}' };
+        break;
+    }
+    
+    setFormData(prev => ({ ...prev, processors: [...prev.processors, newProc] }));
+  };
+
+  const updateProcessor = (index: number, newProc: AnyProcessor) => {
+    setFormData(prev => {
+      const newProcessors = [...prev.processors];
+      newProcessors[index] = newProc;
+      return { ...prev, processors: newProcessors };
+    });
+  };
+
+  const removeProcessor = (index: number) => {
+    setFormData(prev => {
+      const newProcessors = [...prev.processors];
+      newProcessors.splice(index, 1);
+      const updatedProcessors = newProcessors.map((p, idx) => ({ ...p, order: idx }));
+      return { ...prev, processors: updatedProcessors };
     });
   };
 
@@ -326,7 +471,58 @@ export function YamlSchemaBuilder() {
                 </div>
               </div>
             )}
+          </div>
 
+          <div className="property-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Processors</h3>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <select 
+                  className="input-field" 
+                  style={{ padding: '4px 8px', width: 'auto' }}
+                  onChange={e => {
+                    if (e.target.value) {
+                      addProcessor(e.target.value as ProcessorType);
+                      e.target.value = ''; // reset
+                    }
+                  }}
+                >
+                  <option value="">+ Add Processor</option>
+                  <option value="filter_version">filter_version</option>
+                  <option value="filter_attribute">filter_attribute</option>
+                  <option value="addtag">addtag</option>
+                  <option value="replace">replace</option>
+                  <option value="regexreplace">regexreplace</option>
+                  <option value="transform">transform</option>
+                </select>
+              </div>
+            </div>
+
+            {formData.processors.length === 0 && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nenhum processador adicionado.</p>
+            )}
+
+            {formData.processors.map((proc, index) => (
+              <div 
+                key={proc.id}
+                draggable={draggableId === proc.id}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={() => { setDraggedIndex(null); setDraggableId(null); }}
+                style={{
+                  opacity: draggedIndex === index ? 0.5 : 1,
+                  transition: 'opacity 0.2s'
+                }}
+              >
+                <ProcessorEditor 
+                  processor={proc} 
+                  update={(newProc) => updateProcessor(index, newProc)} 
+                  remove={() => removeProcessor(index)} 
+                  setDraggable={(id) => setDraggableId(id)}
+                />
+              </div>
+            ))}
           </div>
 
         </div>

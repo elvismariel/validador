@@ -407,8 +407,8 @@ export function YamlSchemaBuilder() {
           <div className="property-card">
             <h3 style={{ marginBottom: '1rem', fontSize: '0.95rem' }}>Adapter</h3>
             <div className="input-group">
-              <label className="input-label">Adapter Type</label>
-              <select className="input-field" value={formData.adapterType} onChange={e => updateField('adapterType', e.target.value)}>
+              <label htmlFor="adapterType" className="input-label">Adapter Type</label>
+              <select id="adapterType" className="input-field" value={formData.adapterType} onChange={e => updateField('adapterType', e.target.value)}>
                 <option value="http">HTTP</option>
                 <option value="queue">Queue (SQS)</option>
               </select>
@@ -478,6 +478,7 @@ export function YamlSchemaBuilder() {
               <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Processors</h3>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <select 
+                  aria-label="Add Processor"
                   className="input-field" 
                   style={{ padding: '4px 8px', width: 'auto' }}
                   onChange={e => {

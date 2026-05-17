@@ -27,4 +27,13 @@ describe('App Component', () => {
     await userEvent.click(yamlTab);
     expect(screen.getByText(/Construtor Visual \(YAML\)/i)).toBeInTheDocument();
   });
+
+  it('switches back to JSON Builder when tab is clicked', async () => {
+    render(<App />);
+    const yamlTab = screen.getByText(/YAML Event Dispatcher Builder/i);
+    await userEvent.click(yamlTab);
+    const jsonTab = screen.getByText(/JSON Schema Builder/i);
+    await userEvent.click(jsonTab);
+    expect(screen.getByText(/Construtor Visual \(JSON Schema\)/i)).toBeInTheDocument();
+  });
 });

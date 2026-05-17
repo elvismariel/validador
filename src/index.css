@@ -42,7 +42,7 @@ body {
 
 .layout-container {
   display: flex;
-  height: 100vh;
+  height: 100%;
   padding: 1rem;
   gap: 1rem;
 }
